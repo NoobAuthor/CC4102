@@ -1,53 +1,120 @@
 #include "utils.hpp"
 
+#include <chrono>
+#include <cstring>
+#include <iostream>
 #include <random>
 
-namespace sorting_project {
+// Global counter for disk accesses
+int64_t g_disk_access_count = 0;
 
-void merge(uint64_t* arr, size_t left, size_t mid, size_t right) {
-  size_t n1 = mid - left + 1;
-  size_t n2 = right - mid;
-  std::vector<uint64_t> left_arr(n1), right_arr(n2);
-  for (size_t i = 0; i < n1; ++i) left_arr[i] = arr[left + i];
-  for (size_t i = 0; i < n2; ++i) right_arr[i] = arr[mid + 1 + i];
-  size_t i = 0, j = 0, k = left;
-  while (i < n1 && j < n2) {
-    if (left_arr[i] <= right_arr[j])
-      arr[k++] = left_arr[i++];
-    else
-      arr[k++] = right_arr[j++];
-  }
-  while (i < n1) arr[k++] = left_arr[i++];
-  while (j < n2) arr[k++] = right_arr[j++];
-}
+void write_block(FILE* file, int64_t* buffer, size_t block_size, long position) {
+    fseek(file, position * block_size, SEEK_SET);
 
-void in_memory_mergesort(uint64_t* arr, size_t left, size_t right) {
-  if (left < right) {
-    size_t mid = left + (right - left) / 2;
-    in_memory_mergesort(arr, left, mid);
-    in_memory_mergesort(arr, mid + 1, right);
-    merge(arr, left, mid, right);
+  size_t written = fwrite(buffer, 1, block_size, file);
+
+  g_disk_access_count++;
+
+  if (written != block_size) {
+    std::cerr << "Error writing block: " << written
+              << " bytes written instead of " << block_size << std::endl;
   }
 }
 
-size_t binary_search(const uint64_t* arr, size_t size, uint64_t key) {
-  size_t left = 0, right = size;
-  while (left < right) {
-    size_t mid = left + (right - left) / 2;
-    if (arr[mid] <= key)
-      left = mid + 1;
-    else
-      right = mid;
-  }
-  return left;
-}
+void read_block(FILE* file, int64_t* buffer, size_t block_size, long position) {
+  fseek(file, position * block_size, SEEK_SET);
 
-void custom_shuffle(uint64_t* arr, size_t size) {
-  std::mt19937_64 gen(std::random_device{}());
-  for (size_t i = size - 1; i > 0; --i) {
-    size_t j = gen() % (i + 1);
-    std::swap(arr[i], arr[j]);
+  size_t read = fread(buffer, 1, block_size, file);
+
+  g_disk_access_count++;
+
+  if (read != block_size) {
+    memset(((char*)buffer) + read, 0, block_size - read);
   }
 }
 
-}  // namespace sorting_project
+void generate_random_array(const char* filename, size_t size,
+                           size_t block_size) {
+  FILE* file = fopen(filename, "wb");
+  if (!file) {
+    std::cerr << "Could not open file for writing: " << filename << std::endl;
+    return;
+  }
+  std::random_device rd;
+  std::mt19937_64 gen(rd());
+  std::uniform_int_distribution<int64_t> dist;
+
+  size_t ints_per_block = block_size / sizeof(int64_t);
+
+  int64_t* buffer = new int64_t[ints_per_block];
+
+  size_t num_blocks = (size + ints_per_block - 1) / ints_per_block;
+
+  for (size_t block = 0; block < num_blocks; block++) {
+    size_t block_ints = (block == num_blocks - 1 && size % ints_per_block != 0)
+                            ? size % ints_per_block
+                            : ints_per_block;
+
+    for (size_t i = 0; i < block_ints; i++) {
+      buffer[i] = dist(gen);
+    }
+    write_block(file, buffer, block_size, block);
+  }
+
+  delete[] buffer;
+  fclose(file);
+}
+
+bool is_sorted(const char* filename, size_t size, size_t block_size) {
+  FILE* file = fopen(filename, "rb");
+  if (!file) {
+    std::cerr << "Could not open file for reading: " << filename << std::endl;
+    return false;
+  }
+
+  size_t ints_per_block = block_size / sizeof(int64_t);
+
+  int64_t* current_block = new int64_t[ints_per_block];
+
+  size_t num_blocks = (size + ints_per_block - 1) / ints_per_block;
+
+  bool sorted = true;
+  int64_t last_value = INT64_MIN;
+
+  for (size_t block = 0; block < num_blocks && sorted; block++) {
+    read_block(file, current_block, block_size, block);
+
+    size_t block_ints = (block == num_blocks - 1 && size % ints_per_block != 0)
+                            ? size % ints_per_block
+                            : ints_per_block;
+    for (size_t i = 0; i < block_ints && sorted; i++) {
+      if (current_block[i] < last_value) {
+        sorted = false;
+        break;
+      }
+      last_value = current_block[i];
+    }
+  }
+
+  delete[] current_block;
+  fclose(file);
+
+  return sorted;
+}
+
+void reset_disk_access_counter() { g_disk_access_count = 0; }
+
+int64_t get_disk_access_count() { return g_disk_access_count; }
+
+double measure_execution_time(std::function<void()> algorithm) {
+  auto start = std::chrono::high_resolution_clock::now();
+  algorithm();
+  auto end = std::chrono::high_resolution_clock::now();
+
+  std::chrono::duration<double> duration = end - start;
+  return duration.count();
+}
+
+size_t integers_per_block(size_t block_size) {
+  return block_size / sizeof(int64_t);
+}

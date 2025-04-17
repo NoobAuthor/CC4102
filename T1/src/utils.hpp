@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <functional>
 
-// GLobal counter for disk accesses.
+// Global counter for disk accesses.
 extern int64_t g_disk_access_count;
 
 /**
@@ -33,8 +33,7 @@ void read_block(FILE* file, int64_t* buffer, size_t block_size, long position);
  * @param size Number of integers to generate.
  * @param block_size Size of each block in bytes.
  */
-void generate_random_array(const char* filename, size_t size,
-                           size_t block_size);
+void generate_random_array(const char* filename, size_t size, size_t block_size);
 
 /**
  * Check if a binary file contains sorted integers.
