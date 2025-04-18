@@ -8,8 +8,8 @@
 // Global counter for disk accesses
 int64_t g_disk_access_count = 0;
 
-void write_block(FILE* file, int64_t* buffer, size_t block_size, long position) {
-    fseek(file, position * block_size, SEEK_SET);
+void write_block(FILE* file, int64_t* buffer, size_t block_size, long position ){ 
+  fseek(file, position * block_size, SEEK_SET);
 
   size_t written = fwrite(buffer, 1, block_size, file);
 
@@ -33,8 +33,7 @@ void read_block(FILE* file, int64_t* buffer, size_t block_size, long position) {
   }
 }
 
-void generate_random_array(const char* filename, size_t size,
-                           size_t block_size) {
+void generate_random_array(const char* filename, size_t size,size_t block_size) {
   FILE* file = fopen(filename, "wb");
   if (!file) {
     std::cerr << "Could not open file for writing: " << filename << std::endl;
