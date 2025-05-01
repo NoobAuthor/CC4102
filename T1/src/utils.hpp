@@ -47,7 +47,7 @@ bool is_sorted(const char* filename, size_t size, size_t block_size);
 /**
  * Reset the disk access counter
  */
-void reset_disk_access_count();
+void reset_disk_access_counter();
 
 /**
  * Get the current disk acces count
