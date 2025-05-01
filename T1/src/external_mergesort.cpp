@@ -1,7 +1,7 @@
 #include "external_mergesort.hpp"
 #include "utils.hpp"
-#include <algorithm>
-#include <cstring>
+#include <algorithm> 
+#include <cstring> 
 #include <iostream>
 #include <vector>
 
@@ -16,7 +16,7 @@ void external_mergesort(const char* input_file, const char* output_file,
     char** run_files = new char*[max_runs];
     for (int i = 0; i < max_runs; i++) {
         run_files[i] = new char[100];
-        sprintf(run_files[i], "run_%d.bin", i);
+        sprintf(run_files[i], "run_%d.bin", i); // Temporary file names 
     }
     
     int num_runs = create_initial_runs(input_file, run_files, 
