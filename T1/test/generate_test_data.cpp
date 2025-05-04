@@ -44,8 +44,8 @@ void generate_random_blocks(const string& filename, size_t total_numbers, size_t
 
 int main() {
     const string filename = "input.bin";
-    const size_t total_numbers = 10000000;   // 10 millones
-    const size_t block_size = 100000;        // 100 mil por bloque
+    const size_t total_numbers = 100;   // 10 millones
+    const size_t block_size = 1024;        // 100 mil por bloque
     const int max_range = 100000000;         // valores hasta 100 millones
 
     generate_random_blocks(filename, total_numbers, block_size, max_range);

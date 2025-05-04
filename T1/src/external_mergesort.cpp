@@ -4,13 +4,14 @@
 #include <queue>
 #include <string>
 #include <algorithm>
-#include <cstdio> // Para remove()
+#include <filesystem> // <-- Faltaba esto
+#include <cstdio>
 
 const size_t BLOQUE = 1024;
-const size_t M = 4096;
 const size_t B_LIMIT = BLOQUE / sizeof(int);
 
 using namespace std;
+namespace fs = std::filesystem;
 
 void refill_buffer(ifstream& in, vector<int>& buffer, size_t& count) {
     in.read(reinterpret_cast<char*>(buffer.data()), BLOQUE);
@@ -27,10 +28,12 @@ void phase1_split_and_sort(const string& input_file, vector<string>& temp_files)
     vector<int> buffer(B_LIMIT);
     int part = 0;
 
-    while (infile.read(reinterpret_cast<char*>(buffer.data()), BLOQUE) || infile.gcount() > 0) {
+    while (!infile.eof()) {
+        infile.read(reinterpret_cast<char*>(buffer.data()), BLOQUE);
         size_t items_read = infile.gcount() / sizeof(int);
-        buffer.resize(items_read);
-        sort(buffer.begin(), buffer.end());
+        if (items_read == 0) break;
+
+        sort(buffer.begin(), buffer.begin() + items_read);
 
         string temp_name = "temp_" + to_string(part++) + ".bin";
         ofstream temp_out(temp_name, ios::binary);
@@ -108,8 +111,6 @@ void merge_two_files(const string& file1, const string& file2, const string& out
     }
 }
 
-
-
 void phase2_merge(vector<string> temp_files, const string& output_file, int arity = 0) {
     while (temp_files.size() > 1) {
         vector<string> next_round;
@@ -121,8 +122,8 @@ void phase2_merge(vector<string> temp_files, const string& output_file, int arit
                 string merged_file = "merge_" + to_string(arity) + "_" + to_string(i / 2) + ".bin";
                 merge_two_files(temp_files[i], temp_files[i + 1], merged_file);
 
-                remove(temp_files[i]);
-                remove(temp_files[i + 1]);
+                fs::remove(temp_files[i]);
+                fs::remove(temp_files[i + 1]);
                 next_round.push_back(merged_file);
             }
         }
@@ -131,14 +132,14 @@ void phase2_merge(vector<string> temp_files, const string& output_file, int arit
     }
 
     if (!temp_files.empty()) {
-        remove(output_file);
-        rename(temp_files[0], output_file);
+        if (fs::exists(output_file)) {
+            fs::remove(output_file);
+        }
+        fs::rename(temp_files[0], output_file);
     }
 }
 
-
-
-void sort_large_binary_file(const string& input_file, const string& output_file, size_t bloque = BLOQUE) {
+void sort_large_binary_file(const string& input_file, const string& output_file) {
     vector<string> temp_files;
     phase1_split_and_sort(input_file, temp_files);
     if (!temp_files.empty()) {
