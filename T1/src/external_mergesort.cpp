@@ -1,332 +1,134 @@
-#include "external_mergesort.hpp"
-#include "utils.hpp"
-#include <algorithm> 
-#include <cstring> 
 #include <iostream>
+#include <fstream>
 #include <vector>
+#include <queue>
+#include <string>
+#include <algorithm>
+#include <cstdio> // Para remove()
 
-void external_mergesort(const char* input_file, const char* output_file, 
-                        size_t size, size_t block_size, 
-                        size_t memory_limit, int arity) {
-    size_t ints_per_block = integers_per_block(block_size);
-    size_t max_ints_in_memory = memory_limit / sizeof(int64_t);
-    size_t buffer_blocks = memory_limit / block_size / (arity + 1);
-    
-    int max_runs = (size + max_ints_in_memory - 1) / max_ints_in_memory;
-    char** run_files = new char*[max_runs];
-    for (int i = 0; i < max_runs; i++) {
-        run_files[i] = new char[100];
-        sprintf(run_files[i], "run_%d.bin", i); // Temporary file names 
-    }
-    
-    int num_runs = create_initial_runs(input_file, run_files, 
-                                       size, block_size, memory_limit);
-    
-    size_t* run_sizes = new size_t[num_runs];
-    size_t remaining = size;
-    for (int i = 0; i < num_runs; i++) {
-        run_sizes[i] = std::min(max_ints_in_memory, remaining);
-        remaining -= run_sizes[i];
-    }
-    
-    char merge_output_file[100];
-    int num_output_runs = 0;
-    
-    while (num_runs > 1) {
-        int i;
-        for (i = 0; i < num_runs; i += arity) {
-            int num_to_merge = std::min(arity, num_runs - i);
-            sprintf(merge_output_file, "merge_%d.bin", num_output_runs);
-            
-            merge_runs(run_files + i, run_sizes + i, 
-                      merge_output_file, num_to_merge, 
-                      block_size, buffer_blocks, arity);
-            
-            strcpy(run_files[num_output_runs], merge_output_file);
-            run_sizes[num_output_runs] = 0;
-            for (int j = 0; j < num_to_merge; j++) {
-                run_sizes[num_output_runs] += run_sizes[i + j];
-            }
-            
-            num_output_runs++;
-        }
-        
-        num_runs = num_output_runs;
-        num_output_runs = 0;
-    }
-    
-    rename(run_files[0], output_file);
-    
-    for (int i = 0; i < max_runs; i++) {
-        if (i >= num_runs) {
-            remove(run_files[i]);
-        }
-        delete[] run_files[i];
-    }
-    delete[] run_files;
-    delete[] run_sizes;
-}
+const size_t BLOQUE = 1024;
+const size_t M = 4096;
+const size_t B_LIMIT = BLOQUE / sizeof(int);
 
-int create_initial_runs(const char* input_file, char** run_files,
-                        size_t size, size_t block_size, 
-                        size_t memory_limit) {
-    FILE* input = fopen(input_file, "rb");
-    if (!input) {
-        std::cerr << "Could not open input file: " << input_file << std::endl;
-        return 0;
-    }
-    
-    size_t ints_per_block = integers_per_block(block_size);
-    size_t max_ints_in_memory = memory_limit / sizeof(int64_t);
-    size_t blocks_in_memory = max_ints_in_memory / ints_per_block;
-    
-    int64_t* buffer = new int64_t[max_ints_in_memory];
-    
-    int num_runs = 0;
-    size_t remaining = size;
-    
-    while (remaining > 0) {
-        size_t run_ints = std::min(max_ints_in_memory, remaining);
-        size_t run_blocks = (run_ints + ints_per_block - 1) / ints_per_block;
-        
-        size_t ints_read = 0;
-        for (size_t b = 0; b < run_blocks && ints_read < run_ints; b++) {
-            int64_t block_buffer[ints_per_block];
-            read_block(input, block_buffer, block_size, num_runs * blocks_in_memory + b);
-            
-            size_t block_ints = std::min(ints_per_block, run_ints - ints_read);
-            memcpy(buffer + ints_read, block_buffer, block_ints * sizeof(int64_t));
-            ints_read += block_ints;
-        }
-        
-        std::sort(buffer, buffer + run_ints);
-        
-        FILE* run_file = fopen(run_files[num_runs], "wb");
-        if (!run_file) {
-            std::cerr << "Could not create run file: " << run_files[num_runs] << std::endl;
-            delete[] buffer;
-            fclose(input);
-            return num_runs;
-        }
-        
-        size_t ints_written = 0;
-        for (size_t b = 0; b < run_blocks && ints_written < run_ints; b++) {
-            size_t block_ints = std::min(ints_per_block, run_ints - ints_written);
-            int64_t block_buffer[ints_per_block];
-            
-            memcpy(block_buffer, buffer + ints_written, block_ints * sizeof(int64_t));
-            
-            if (block_ints < ints_per_block) {
-                memset(block_buffer + block_ints, 0, (ints_per_block - block_ints) * sizeof(int64_t));
-            }
-            
-            write_block(run_file, block_buffer, block_size, b);
-            ints_written += block_ints;
-        }
-        
-        fclose(run_file);
-        num_runs++;
-        remaining -= run_ints;
-    }
-    
-    delete[] buffer;
-    fclose(input);
-    
-    return num_runs;
-}
+using namespace std;
 
-void merge_runs(char** run_files, size_t* run_sizes, 
-                const char* output_file, int num_runs,
-                size_t block_size, size_t buffer_blocks, 
-                int arity) {
-    if (num_runs <= 0) return;
-    if (num_runs == 1) {
-        rename(run_files[0], output_file);
+void phase1_split_and_sort(const string& input_file, vector<string>& temp_files) {
+    ifstream infile(input_file, ios::binary);
+    if (!infile) {
+        cerr << "Error al abrir archivo de entrada." << endl;
         return;
     }
-    
-    FILE** input_files = new FILE*[num_runs];
-    for (int i = 0; i < num_runs; i++) {
-        input_files[i] = fopen(run_files[i], "rb");
-        if (!input_files[i]) {
-            std::cerr << "Could not open run file: " << run_files[i] << std::endl;
-            for (int j = 0; j < i; j++) {
-                fclose(input_files[j]);
-            }
-            delete[] input_files;
-            return;
-        }
+
+    vector<int> buffer(B_LIMIT);
+    int part = 0;
+
+    while (infile.read(reinterpret_cast<char*>(buffer.data()), BLOQUE) || infile.gcount() > 0) {
+        size_t items_read = infile.gcount() / sizeof(int);
+        sort(buffer.begin(), buffer.begin() + items_read);
+
+        string temp_name = "temp_" + to_string(part++) + ".bin";
+        ofstream temp_out(temp_name, ios::binary);
+        temp_out.write(reinterpret_cast<char*>(buffer.data()), items_read * sizeof(int));
+        temp_out.close();
+
+        temp_files.push_back(temp_name);
     }
-    
-    FILE* output = fopen(output_file, "wb");
-    if (!output) {
-        std::cerr << "Could not create output file: " << output_file << std::endl;
-        for (int i = 0; i < num_runs; i++) {
-            fclose(input_files[i]);
-        }
-        delete[] input_files;
-        return;
-    }
-    
-    size_t ints_per_block = integers_per_block(block_size);
-    size_t input_buffer_blocks = buffer_blocks / (num_runs + 1);
-    size_t output_buffer_blocks = buffer_blocks - (input_buffer_blocks * num_runs);
-    
-    if (input_buffer_blocks == 0) input_buffer_blocks = 1;
-    if (output_buffer_blocks == 0) output_buffer_blocks = 1;
-    
-    int64_t** input_buffers = new int64_t*[num_runs];
-    for (int i = 0; i < num_runs; i++) {
-        input_buffers[i] = new int64_t[input_buffer_blocks * ints_per_block];
-    }
-    int64_t* output_buffer = new int64_t[output_buffer_blocks * ints_per_block];
-    
-    size_t* current_positions = new size_t[num_runs];
-    size_t* buffer_positions = new size_t[num_runs];
-    size_t* buffer_sizes = new size_t[num_runs];
-    size_t* remaining_elements = new size_t[num_runs];
-    
-    for (int i = 0; i < num_runs; i++) {
-        current_positions[i] = 0;
-        buffer_positions[i] = 0;
-        buffer_sizes[i] = 0;
-        remaining_elements[i] = run_sizes[i];
-    }
-    
-    for (int i = 0; i < num_runs; i++) {
-        if (remaining_elements[i] > 0) {
-            size_t blocks_to_read = std::min(input_buffer_blocks, 
-                                         (remaining_elements[i] + ints_per_block - 1) / ints_per_block);
-            for (size_t b = 0; b < blocks_to_read; b++) {
-                read_block(input_files[i], input_buffers[i] + b * ints_per_block, 
-                          block_size, current_positions[i]++);
-            }
-            
-            buffer_sizes[i] = std::min(blocks_to_read * ints_per_block, remaining_elements[i]);
-            remaining_elements[i] -= buffer_sizes[i];
-        }
-    }
-    
-    size_t output_position = 0;
-    size_t output_buffer_position = 0;
-    
-    bool runs_remaining = true;
-    while (runs_remaining) {
-        int smallest_run = -1;
-        for (int i = 0; i < num_runs; i++) {
-            if (buffer_positions[i] < buffer_sizes[i]) {
-                if (smallest_run == -1 || 
-                    input_buffers[i][buffer_positions[i]] < 
-                    input_buffers[smallest_run][buffer_positions[smallest_run]]) {
-                    smallest_run = i;
-                }
-            }
-        }
-        
-        if (smallest_run == -1) {
-            runs_remaining = false;
-            break;
-        }
-        
-        output_buffer[output_buffer_position++] = 
-            input_buffers[smallest_run][buffer_positions[smallest_run]++];
-        
-        if (output_buffer_position == output_buffer_blocks * ints_per_block) {
-            write_block(output, output_buffer, block_size, output_position++);
-            output_buffer_position = 0;
-        }
-        
-        if (buffer_positions[smallest_run] == buffer_sizes[smallest_run] && 
-            remaining_elements[smallest_run] > 0) {
-            
-            size_t blocks_to_read = std::min(input_buffer_blocks, 
-                                         (remaining_elements[smallest_run] + ints_per_block - 1) / 
-                                         ints_per_block);
-            
-            for (size_t b = 0; b < blocks_to_read; b++) {
-                read_block(input_files[smallest_run], 
-                          input_buffers[smallest_run] + b * ints_per_block, 
-                          block_size, current_positions[smallest_run]++);
-            }
-            
-            buffer_positions[smallest_run] = 0;
-            buffer_sizes[smallest_run] = std::min(blocks_to_read * ints_per_block, 
-                                              remaining_elements[smallest_run]);
-            remaining_elements[smallest_run] -= buffer_sizes[smallest_run];
-        }
-    }
-    
-    if (output_buffer_position > 0) {
-        if (output_buffer_position < output_buffer_blocks * ints_per_block) {
-            memset(output_buffer + output_buffer_position, 0, 
-                  (output_buffer_blocks * ints_per_block - output_buffer_position) * sizeof(int64_t));
-        }
-        
-        write_block(output, output_buffer, block_size, output_position);
-    }
-    
-    for (int i = 0; i < num_runs; i++) {
-        fclose(input_files[i]);
-        remove(run_files[i]);  
-        delete[] input_buffers[i];
-    }
-    delete[] input_buffers;
-    delete[] output_buffer;
-    delete[] input_files;
-    delete[] current_positions;
-    delete[] buffer_positions;
-    delete[] buffer_sizes;
-    delete[] remaining_elements;
-    
-    fclose(output);
+
+    infile.close();
 }
 
-int64_t test_mergesort(const char* filename, size_t size, 
-                      size_t block_size, size_t memory_limit, 
-                      int arity) {
-    char test_input[100];
-    sprintf(test_input, "%s.test", filename);
-    
-    FILE* src = fopen(filename, "rb");
-    FILE* dst = fopen(test_input, "wb");
-    
-    if (!src || !dst) {
-        std::cerr << "Could not open files for test copy" << std::endl;
-        if (src) fclose(src);
-        if (dst) fclose(dst);
-        return INT64_MAX;
+void merge_two_files(const string& file1, const string& file2, const string& output_file) {
+    ifstream in1(file1, ios::binary);
+    ifstream in2(file2, ios::binary);
+    ofstream out(output_file, ios::binary);
+
+    vector<int> buffer1(B_LIMIT), buffer2(B_LIMIT), buffer_out(B_LIMIT);
+    size_t idx1 = 0, idx2 = 0, out_idx = 0;
+    size_t read1 = 0, read2 = 0;
+
+    auto refill_buffer = [](ifstream& in, vector<int>& buffer, size_t& count) {
+        in.read(reinterpret_cast<char*>(buffer.data()), BLOQUE);
+        count = in.gcount() / sizeof(int);
+    };
+
+    refill_buffer(in1, buffer1, read1);
+    refill_buffer(in2, buffer2, read2);
+
+    while (idx1 < read1 || idx2 < read2 || !in1.eof() || !in2.eof()) {
+        if (idx1 >= read1 && !in1.eof()) {
+            refill_buffer(in1, buffer1, read1);
+            idx1 = 0;
+        }
+        if (idx2 >= read2 && !in2.eof()) {
+            refill_buffer(in2, buffer2, read2);
+            idx2 = 0;
+        }
+
+        if (idx1 < read1 && (idx2 >= read2 || buffer1[idx1] <= buffer2[idx2])) {
+            buffer_out[out_idx++] = buffer1[idx1++];
+        } else if (idx2 < read2) {
+            buffer_out[out_idx++] = buffer2[idx2++];
+        }
+
+        if (out_idx == B_LIMIT) {
+            out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
+            out_idx = 0;
+        }
     }
-    
-    int64_t buffer[integers_per_block(block_size)];
-    size_t blocks = (size + integers_per_block(block_size) - 1) / integers_per_block(block_size);
-    
-    for (size_t i = 0; i < blocks; i++) {
-        read_block(src, buffer, block_size, i);
-        write_block(dst, buffer, block_size, i);
+
+    if (out_idx > 0) {
+        out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
     }
-    
-    fclose(src);
-    fclose(dst);
-    
-    char test_output[100];
-    sprintf(test_output, "%s.sorted", filename);
-    
-    reset_disk_access_counter();
-    
-    double time = measure_execution_time([&]() {
-        external_mergesort(test_input, test_output, size, block_size, memory_limit, arity);
-    });
-    
-    int64_t io_count = get_disk_access_count();
-    
-    bool sorted = is_sorted(test_output, size, block_size);
-    if (!sorted) {
-        std::cerr << "Warning: Result is not sorted for arity " << arity << std::endl;
-        return INT64_MAX;
+
+    in1.close();
+    in2.close();
+    out.close();
+}
+
+
+
+void phase2_merge(const vector<string>& temp_files, const string& output_file, int arity = 0) { 
+    if (temp_files.size() == 1) {
+        remove(output_file.c_str());
+        rename(temp_files[0].c_str(), output_file.c_str());
+        return;
     }
-    
-    remove(test_input);
-    remove(test_output);
-    
-    return io_count + static_cast<int64_t>(time * 1000);
+
+    vector<string> temp_files2;
+
+    for (size_t i = 0; i < temp_files.size(); i += 2) {
+        string file1 = temp_files[i];
+        string file2 = (i + 1 < temp_files.size()) ? temp_files[i + 1] : "";
+        string temp_out_name = "merge_" + to_string(arity) + "_" + to_string(i / 2) + ".bin";
+
+        if (file2.empty()) {
+            // Si no hay segundo archivo, solo lo pasamos directo
+            temp_files2.push_back(file1);
+        } else {
+            merge_two_files(file1, file2, temp_out_name);
+            temp_files2.push_back(temp_out_name);
+
+            remove(file1.c_str());
+            remove(file2.c_str());
+        }
+    }
+
+    phase2_merge(temp_files2, output_file, arity + 1);
+}
+
+
+
+void sort_large_binary_file(const string& input_file, const string& output_file) {
+    vector<string> temp_files;
+    phase1_split_and_sort(input_file, temp_files);
+    phase2_merge(temp_files, output_file);
+    cout << "Ordenamiento completo." << endl;
+}
+
+int main() {
+    string input_file = "input.bin";
+    string output_file = "output.bin";
+
+    sort_large_binary_file(input_file, output_file);
+    return 0;
 }
