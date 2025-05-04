@@ -4,18 +4,19 @@
 #include <queue>
 #include <string>
 #include <algorithm>
-#include <filesystem> // <-- Faltaba esto
+#include <filesystem>
 #include <cstdio>
+#include <cstdint>  // para int64_t
 
 const size_t BLOQUE = 1024;
-const size_t B_LIMIT = BLOQUE / sizeof(int);
+const size_t B_LIMIT = BLOQUE / sizeof(int64_t);  // Cambié el tamaño del bloque a 64 bits
 
 using namespace std;
 namespace fs = std::filesystem;
 
-void refill_buffer(ifstream& in, vector<int>& buffer, size_t& count) {
+void refill_buffer(ifstream& in, vector<int64_t>& buffer, size_t& count) {
     in.read(reinterpret_cast<char*>(buffer.data()), BLOQUE);
-    count = in.gcount() / sizeof(int);
+    count = in.gcount() / sizeof(int64_t);
 }
 
 void phase1_split_and_sort(const string& input_file, vector<string>& temp_files) {
@@ -25,12 +26,12 @@ void phase1_split_and_sort(const string& input_file, vector<string>& temp_files)
         return;
     }
 
-    vector<int> buffer(B_LIMIT);
+    vector<int64_t> buffer(B_LIMIT);
     int part = 0;
 
     while (!infile.eof()) {
         infile.read(reinterpret_cast<char*>(buffer.data()), BLOQUE);
-        size_t items_read = infile.gcount() / sizeof(int);
+        size_t items_read = infile.gcount() / sizeof(int64_t);
         if (items_read == 0) break;
 
         sort(buffer.begin(), buffer.begin() + items_read);
@@ -41,7 +42,7 @@ void phase1_split_and_sort(const string& input_file, vector<string>& temp_files)
             cerr << "Error al crear archivo temporal." << endl;
             return;
         }
-        temp_out.write(reinterpret_cast<char*>(buffer.data()), items_read * sizeof(int));
+        temp_out.write(reinterpret_cast<char*>(buffer.data()), items_read * sizeof(int64_t));
         if (!temp_out) {
             cerr << "Error al escribir en archivo temporal." << endl;
             return;
@@ -61,7 +62,7 @@ void merge_two_files(const string& file1, const string& file2, const string& out
         return;
     }
 
-    vector<int> buffer1(B_LIMIT), buffer2(B_LIMIT), buffer_out(B_LIMIT);
+    vector<int64_t> buffer1(B_LIMIT), buffer2(B_LIMIT), buffer_out(B_LIMIT);
     size_t idx1 = 0, idx2 = 0, out_idx = 0;
     size_t read1 = 0, read2 = 0;
 
@@ -76,7 +77,7 @@ void merge_two_files(const string& file1, const string& file2, const string& out
                 buffer_out[out_idx++] = buffer2[idx2++];
             }
             if (out_idx == B_LIMIT) {
-                out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
+                out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int64_t));
                 out_idx = 0;
             }
         }
@@ -94,20 +95,20 @@ void merge_two_files(const string& file1, const string& file2, const string& out
     while (idx1 < read1) {
         buffer_out[out_idx++] = buffer1[idx1++];
         if (out_idx == B_LIMIT) {
-            out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
+            out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int64_t));
             out_idx = 0;
         }
     }
     while (idx2 < read2) {
         buffer_out[out_idx++] = buffer2[idx2++];
         if (out_idx == B_LIMIT) {
-            out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
+            out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int64_t));
             out_idx = 0;
         }
     }
 
     if (out_idx > 0) {
-        out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int));
+        out.write(reinterpret_cast<char*>(buffer_out.data()), out_idx * sizeof(int64_t));
     }
 }
 
