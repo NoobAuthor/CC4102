@@ -1,52 +1,34 @@
 #ifndef EXTERNAL_MERGESORT_HPP
 #define EXTERNAL_MERGESORT_HPP
 
-#include <cstddef>
 #include <cstdint>
+#include <cstddef>
+#include <vector>
+#include <string>
 
-/**
- * Sort a file using External Mergesort algorithm.
- * @param input_file Path to input file 
- * @param output_file Path to output file
- * @param size Number of intefers in the file
- * @param block_size Size of disk blocks in bytes 
- * @param memory_limit Memory limit in bytes
- * @param arity Number of runs to merge at once
- */
-void external_mergesort(const char* input_file, const char* output_file, size_t size, size_t block_size, size_t memory_limit, int arity);
+// Returns file size in bytes
+template<typename T>
+size_t getFileSize(const std::string& filename);
 
-/**
- * Create initial sorted runs
- * @param input_file Path to input file
- * @param run_files Array of run file paths
- * @param size Number of integers in the file
- * @param block_size Size of disk blocks in bytes
- * @param memory_limit Memory limit in bytes
- * @return Number of runs created
- */
-int create_initial_runs(const char* input_file, const char** run_files, size_t size, size_t block_size, size_t memory_limit);
+// Reads up to 'count' int64_t values starting from 'start' index
+std::vector<int64_t> readInts(const std::string& filename, size_t start, size_t count);
 
-/**
- * Merge a group of runs
- * @param run_files Array of run file paths
- * @param run_sizes Array of run sizes
- * @param output_file Path to output file
- * @param num_runs Number of runs to merge
- * @param block_size Size of disk blocks in bytes
- * @param buffer_blocks Number of blocks for buffer
- * @param arity Number of runs to merge at once
- */
-void merge_runs(const char** run_files, size_t* run_sizes, const char* output_file, int num_runs, size_t block_size, size_t buffer_blocks, int arity);
+// Appends values to a binary file
+void appendInts(const std::string& filename, const std::vector<int64_t>& data);
 
-/**
- * Test Mergesort with given parameters and return performance metrics
- * @param filename Path to input file
- * @param size Number of integers in the file
- * @param block_size Size of disk blocks in bytes
- * @param memory_limit Memory limit in bytes
- * @param arity Number of runs to merge at once
- * @return Performance metrics (weighted combination of time and I/O)
- */
-int64_t test_mergesort(const char* filename, size_t size, size_t block_size, size_t memory_limit, int arity);
+// Sorts a small file entirely in memory
+void sortInMemory(const std::string& inFile, const std::string& outFile);
 
-#endif // EXTERNAL_MERGESORT_HPP 
+// Creates sorted runs of size <= memBytes and returns their filenames
+std::vector<std::string> createInitialRuns(const std::string& inFile, size_t memBytes);
+
+// Merges runs in multiple passes using up to 'arity' runs per merge
+void mergeRuns(std::vector<std::string>& runFiles, size_t memBytes, int arity);
+
+// The main external mergesort function
+void externalMergesort(const std::string& inFile,
+                       const std::string& outFile,
+                       size_t memBytes,
+                       int arity);
+
+#endif // EXTERNAL_MERGESORT_HPP
