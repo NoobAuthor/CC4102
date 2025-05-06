@@ -1,52 +1,32 @@
 #ifndef EXTERNAL_QUICKSORT_HPP
 #define EXTERNAL_QUICKSORT_HPP
 
-#include <cstddef>
 #include <cstdint>
+#include <cstddef>
+#include <vector>
+#include <string>
 
-/**
- * Sort a file using External Quicksort algorithm-
- * @param input_file The path to the input file.
- * @param output_file The path to the output file.
- * @param size Number of integers in the file.
- * @param memory_limit The maximum amount of memory to use for sorting.
- * @param num_pivots Number of pivots to use (arity - 1).
- */
-void external_quicksort(const char* input_file, const char* output_file, size_t size, size_t block_size, size_t memory_limit, int num_pivots);
+// Returns file size in bytes
+size_t getFileSize(const std::string& filename);
 
-/**
- * Sort a file using External Quicksort algorithm (recursive helper).
- * @param input_file The path to the input file.
- * @param output_file The path to the output file.
- * @param size Number of integers in the file.
- * @param block_size The size of the blocks to read from the file.
- * @param memory_limit The maximum amount of memory to use for sorting.
- * @param num_pivots Number of pivots to use (arity - 1).
- * @param depth The current depth of the recursion.
- */
-void external_quicksort_recursive(const char* input_file, const char* output_file, size_t size, size_t block_size, size_t memory_limit, int num_pivots, int depth);
+// Reads up to 'count' int64_t values starting from 'start' index
+std::vector<int64_t> readInts(const std::string& filename, size_t start, size_t count);
 
-/**
- * Select pivots from the input file.
- * @param input_file The path to the input file.
- * @param size Number of integers in the file.
- * @param block_size The size of the blocks to read from the file.
- * @param num_pivots Number of pivots to select.
- * @param pivots Array to store the selected pivots.
- */
-void select_pivots(const char* input_file, size_t size, size_t block_size, int num_pivots, int64_t* pivots);
+// Appends values to a binary file
+void appendInts(const std::string& filename, const std::vector<int64_t>& data);
 
-/**
- * Partition the input file based on the selected pivots.
- * @param input_file The path to the input file.
- * @param partition_files Array of partition file paths.
- * @param partition_sizes Array to store the sizes of each partition.
- * @param size Number of integers in the file.
- * @param block_size The size of the blocks to read from the file.
- * @param memmory_limit The maximum amount of memory to use for sorting.
- * @param pivot| Array of pivots.
- * @param num_pivots Number of pivots to use (arity - 1).
- */
-void partition_file(const char* input_file, const char** partition_files, size_t* partition_sizes, size_t size, size_t block_size, size_t memory_limit, int64_t* pivots, int num_pivots);
+// Sorts small files in memory
+void sortInMemory(const std::string& inFile, const std::string& outFile);
+
+// Chooses pivots using reservoir sampling
+std::vector<int64_t> choosePivots(const std::string& filename, size_t memBytes, int parts);
+
+// Partitions file into 'parts+1' temporary files based on pivots
+void partitionFile(const std::string& file, const std::vector<int64_t>& pivots,
+                   std::vector<std::string>& outFiles, size_t memBytes);
+
+// External quicksort main function
+void externalQuicksort(const std::string& inFile, const std::string& outFile,
+                       size_t memBytes, int parts);
 
 #endif // EXTERNAL_QUICKSORT_HPP
