@@ -5,38 +5,10 @@
 Este proyecto implementa y compara dos algoritmos de ordenamiento externo (**Mergesort Externo** y **Quicksort Externo**) diseñados para trabajar con conjuntos de datos que no caben completamente en la memoria principal. El objetivo es evaluar su rendimiento en términos de:
 
 - **Tiempo de ejecución**
-- **Cantidad de accesos a disco**  
-  Ambos factores críticos en aplicaciones de big data y procesamiento de archivos masivos.
+- **Cantidad de accesos a disco**
+- **Aridad óptima** (parámetro crítico para Mergesort)
 
-## Objetivos
-
-1. Implementar los algoritmos de Mergesort y Quicksort adaptados a memoria secundaria.
-2. Comparar su eficiencia usando métricas de tiempo y operaciones de I/O.
-3. Determinar bajo qué condiciones cada algoritmo es más adecuado.
-
-## Estructura del Código
-
-### Componentes principales:
-
-1. **`external_mergesort`**
-
-   - Divide el archivo en _runs_ ordenados.
-   - Realiza merges en cascada con una aridad óptima (`a`).
-
-2. **`external_quicksort`**
-
-   - Particiona recursivamente el archivo usando pivotes seleccionados con _reservoir sampling_.
-   - Ordena particiones en memoria cuando es posible.
-
-3. **`disk_io`**
-   - Módulo de lectura/escritura en bloques de tamaño `B`.
-   - Cuenta accesos a disco para métricas.
-
-### Archivos clave:
-
-- `src/`: Implementaciones de los algoritmos y E/S.
-- `test/`: Pruebas unitarias de correctitud.
-- `experiment.cpp`: Script de experimentación automatizada.
+Ambos algoritmos utilizan la misma aridad óptima (`a`), determinada mediante una búsqueda binaria sobre un dataset de 60M elementos.
 
 ## Instrucciones de Ejecución
 
@@ -59,35 +31,82 @@ Este proyecto implementa y compara dos algoritmos de ordenamiento externo (**Mer
    make tests    # Verifica que ambos algoritmos ordenen correctamente
    ```
 
-3. **Ejecutar experimento principal**:
+3. **Ejecutar experimento completo**:
 
    ```bash
-   make experiment  # Genera resultados en results.csv (B=4KB, M=50MB)
+   make experiment  # Genera resultados en results.csv
    ```
+
+   Este comando realiza **3 pasos automáticos**:
+
+   - **Paso 1**: Genera un dataset de 60M elementos y determina la aridad óptima mediante búsqueda binaria.
+   - **Paso 2**: Ejecuta 5 iteraciones para cada tamaño de dataset (4M a 60M).
+   - **Paso 3**: Guarda métricas promediadas en `results.csv`.
 
 4. **Opcional: Ejecutar en Docker** (limita memoria a 512MB):
    ```bash
    make docker   # Construye y ejecuta en contenedor
    ```
 
-### Parámetros personalizados:
+### Parámetros clave:
 
-Modifique en el `Makefile`:
+| Parámetro | Valor por defecto | Descripción                                 |
+| --------- | ----------------- | ------------------------------------------- |
+| `B`       | 4096 (4KB)        | Tamaño de bloque de disco                   |
+| `M`       | 52428800 (50MB)   | Memoria disponible                          |
+| `a`       | Automático        | Aridad óptima determinada experimentalmente |
 
-```makefile
-# Tamaño de bloque (B) y memoria (M)
-B := 4096        # 4KB
-M := 52428800    # 50MB
+### Salidas:
+
+1. **Resultados numéricos**:
+   ```csv
+   N,alg,avg_time_ms,avg_reads,avg_writes
+   4000000,QUICK,1523.8,14200,13800
+   4000000,MERGE,1489.2,13500,13200
+   ...
+   ```
+2. **Log de consola**:
+   ```text
+   Aridad óptima encontrada: 16
+   Ejecutando experimento para N=4,000,000...
+   ```
+
+## Personalización avanzada
+
+1. **Modificar parámetros base** (en `Makefile`):
+
+   ```makefile
+   B := 4096        # Tamaño de bloque (bytes)
+   M := 52428800    # Memoria disponible (bytes)
+   ```
+
+2. **Forzar una aridad específica** (modificar `experiment.cpp`):
+   ```cpp
+   // En main(), reemplazar:
+   const int best_arity = findOptimalArity(...);
+   // Por:
+   const int best_arity = 24; // Valor manual
+   ```
+
+## Estructura del proyecto
+
+```
+T1/
+├── bin/           # Ejecutables compilados
+├── doc/           # Documentation on each individual file
+├── src/           # Código fuente
+├── test/          # Pruebas unitarias
+├── Makefile       # Configuración de compilación
+├── results.csv    # Resultados del experimento (generado)
+└── README.md      # Esta documentación
 ```
 
-## Resultados
+## Análisis de resultados
 
-El experimento genera un archivo `results.csv` con formato:
+El archivo `results.csv` permite comparar:
 
-```csv
-N,algorithm,avg_time_ms,avg_reads,avg_writes
-```
+- **Escalabilidad** de ambos algoritmos con diferentes `N`.
+- **Impacto de la aridad** en el rendimiento.
+- **Eficiencia en I/O** (lecturas/escrituras por bloque).
 
-## Conclusión
-
-Este proyecto permite analizar cómo escalan ambos algoritmos con diferentes tamaños de datos (`N`), ayudando a elegir la mejor opción según las restricciones de memoria y requisitos de rendimiento.
+¡Contribuciones y mejoras son bienvenidas! 🚀
