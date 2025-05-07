@@ -4,7 +4,12 @@
 #include <algorithm>
 #include <numeric>
 #include <random>
-#include <cstdint>  // para int64_t
+#include <cstdint>
+
+const size_t BLOQUE = 4096
+const size_t M = 51200
+const size_t B_LIMIT = BLOQUE / sizeof(int64_t); 
+const size_t M_LIMIT = 51200/ sizeof(int64_t); 
 
 using namespace std;
 
@@ -45,8 +50,7 @@ void generate_random_blocks(const string& filename, size_t total_numbers, size_t
 
 int main() {
     const string filename = "input.bin";
-    const size_t total_numbers = 100;   // 10 millones (ajusta según necesidad real)
-    const size_t block_size = 1024;     // 100 mil por bloque
+    const size_t total_numbers = M_LIMIT*4;
     const int64_t max_range = 10000000000;  // valores hasta 10 mil millones
 
     generate_random_blocks(filename, total_numbers, block_size, max_range);
