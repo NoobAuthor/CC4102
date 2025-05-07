@@ -1,104 +1,93 @@
-### Fase 1: Creación de Runs Iniciales
+# Tarea 1: Comparación de Mergesort Externo vs Quicksort Externo
 
-1. El archivo de entrada se divide en chunks (fragmentos) que caben en la memoria disponible.
-2. Cada chunk se carga en memoria, se ordena utilizando un algoritmo de ordenamiento interno (en este caso, `std::sort`), y se escribe de vuelta al disco como un "run" ordenado.
-3. Este proceso continúa hasta que todo el archivo de entrada ha sido procesado, generando múltiples runs ordenados.
+## Introducción
 
-### Fase 2: Merge de Runs
+Este proyecto implementa y compara dos algoritmos de ordenamiento externo (**Mergesort Externo** y **Quicksort Externo**) diseñados para trabajar con conjuntos de datos que no caben completamente en la memoria principal. El objetivo es evaluar su rendimiento en términos de:
 
-1. Los runs creados en la fase anterior se combinan de manera eficiente usando un proceso de merge de K-vías, donde K es la aridad del merge.
-2. Si hay más runs que la aridad permitida, se realizan múltiples pasadas de merge, combinando runs en cada pasada hasta que quede un solo run final ordenado.
-3. En cada paso del merge, se mantienen buffers para cada run de entrada y para el run de salida para minimizar los accesos a disco.
+- **Tiempo de ejecución**
+- **Cantidad de accesos a disco**  
+  Ambos factores críticos en aplicaciones de big data y procesamiento de archivos masivos.
 
-## Componentes Principales
+## Objetivos
 
-### `external_mergesort`
+1. Implementar los algoritmos de Mergesort y Quicksort adaptados a memoria secundaria.
+2. Comparar su eficiencia usando métricas de tiempo y operaciones de I/O.
+3. Determinar bajo qué condiciones cada algoritmo es más adecuado.
 
-Función principal que coordina todo el proceso de ordenamiento externo:
+## Estructura del Código
 
-1. Determina el número de enteros que pueden caber en un bloque y en memoria.
-2. Crea archivos temporales para los runs.
-3. Llama a `create_initial_runs` para generar los runs iniciales ordenados.
-4. Realiza pasadas sucesivas de merge usando `merge_runs` hasta que quede un solo run.
-5. Renombra el último run como el archivo de salida final y limpia los archivos temporales.
+### Componentes principales:
 
-```cpp
-void external_mergesort(const char* input_file, const char* output_file,
-                        size_t size, size_t block_size,
-                        size_t memory_limit, int arity)
+1. **`external_mergesort`**
+
+   - Divide el archivo en _runs_ ordenados.
+   - Realiza merges en cascada con una aridad óptima (`a`).
+
+2. **`external_quicksort`**
+
+   - Particiona recursivamente el archivo usando pivotes seleccionados con _reservoir sampling_.
+   - Ordena particiones en memoria cuando es posible.
+
+3. **`disk_io`**
+   - Módulo de lectura/escritura en bloques de tamaño `B`.
+   - Cuenta accesos a disco para métricas.
+
+### Archivos clave:
+
+- `src/`: Implementaciones de los algoritmos y E/S.
+- `test/`: Pruebas unitarias de correctitud.
+- `experiment.cpp`: Script de experimentación automatizada.
+
+## Instrucciones de Ejecución
+
+### Requisitos:
+
+- Compilador C++17 (g++ o clang++)
+- Docker (opcional, para entorno controlado)
+
+### Pasos:
+
+1. **Compilar el proyecto**:
+
+   ```bash
+   make          # Compila todos los componentes
+   ```
+
+2. **Ejecutar pruebas de correctitud**:
+
+   ```bash
+   make tests    # Verifica que ambos algoritmos ordenen correctamente
+   ```
+
+3. **Ejecutar experimento principal**:
+
+   ```bash
+   make experiment  # Genera resultados en results.csv (B=4KB, M=50MB)
+   ```
+
+4. **Opcional: Ejecutar en Docker** (limita memoria a 512MB):
+   ```bash
+   make docker   # Construye y ejecuta en contenedor
+   ```
+
+### Parámetros personalizados:
+
+Modifique en el `Makefile`:
+
+```makefile
+# Tamaño de bloque (B) y memoria (M)
+B := 4096        # 4KB
+M := 52428800    # 50MB
 ```
 
-### `create_initial_runs`
+## Resultados
 
-Divide el archivo de entrada en fragmentos que caben en memoria, los ordena y los escribe como runs individuales:
+El experimento genera un archivo `results.csv` con formato:
 
-1. Lee bloques del archivo de entrada hasta llenar la memoria disponible.
-2. Ordena los datos en memoria usando `std::sort`.
-3. Escribe los datos ordenados como un run en un archivo temporal.
-4. Repite hasta procesar todo el archivo de entrada.
-
-```cpp
-int create_initial_runs(const char* input_file, char** run_files,
-                        size_t size, size_t block_size,
-                        size_t memory_limit)
+```csv
+N,algorithm,avg_time_ms,avg_reads,avg_writes
 ```
 
-### `merge_runs`
+## Conclusión
 
-Combina múltiples runs en uno solo utilizando un algoritmo de merge de K-vías:
-
-1. Abre los archivos de cada run para lectura.
-2. Asigna buffers para cada run de entrada y para el run de salida.
-3. Inicializa estructuras para rastrear posiciones y elementos restantes en cada run.
-4. Carga los primeros bloques de cada run en sus respectivos buffers.
-5. Repite hasta que todos los runs estén vacíos:
-   - Encuentra el run con el elemento más pequeño actual.
-   - Mueve ese elemento al buffer de salida.
-   - Si el buffer de salida está lleno, escríbelo a disco.
-   - Si un buffer de entrada se vacía y quedan elementos en el run, carga más datos de ese run.
-6. Escribe cualquier dato restante en el buffer de salida y limpia recursos.
-
-```cpp
-void merge_runs(char** run_files, size_t* run_sizes,
-                const char* output_file, int num_runs,
-                size_t block_size, size_t buffer_blocks,
-                int arity)
-```
-
-## Manejo de Disco
-
-El código implementa un manejo eficiente de disco mediante:
-
-1. **Operaciones por Bloques**: Todas las lecturas y escrituras se realizan por bloques completos.
-2. **Buffers**: Se utilizan buffers en memoria para minimizar las operaciones de E/S.
-3. **Archivos Temporales**: Los runs intermedios se almacenan en archivos temporales que se eliminan cuando ya no son necesarios.
-
-## Función de Prueba
-
-La función `test_mergesort` permite probar el algoritmo con diferentes parámetros y medir su rendimiento:
-
-1. Crea una copia del archivo de entrada para no modificarlo.
-2. Ejecuta el algoritmo de mergesort y mide el tiempo y los accesos a disco.
-3. Verifica que el resultado esté correctamente ordenado.
-4. Devuelve una métrica combinada de rendimiento (IO + tiempo).
-
-```cpp
-int64_t test_mergesort(const char* filename, size_t size,
-                      size_t block_size, size_t memory_limit,
-                      int arity)
-```
-
-## Complejidad
-
-La complejidad del algoritmo en términos de accesos a disco (I/O) es:
-
-O((N/B) \* log_K(N/M))
-
-Donde:
-
-- N: Número total de enteros a ordenar
-- B: Número de enteros por bloque
-- M: Número de enteros que caben en memoria
-- K: Aridad del merge
-
-Esta implementación está optimizada para minimizar tanto los accesos a disco como el tiempo total de ejecución.
+Este proyecto permite analizar cómo escalan ambos algoritmos con diferentes tamaños de datos (`N`), ayudando a elegir la mejor opción según las restricciones de memoria y requisitos de rendimiento.
