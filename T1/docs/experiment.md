@@ -134,8 +134,6 @@ plt.legend()
 plt.show()
 ```
 
-![Gráfico de Tiempos](https://i.imgur.com/9Zk7lFQ.png)
-
 ## Consejos para Ejecución Exitosa
 
 1. **Ejecutar en SSD**: Reduce tiempo de I/O un 300-500%

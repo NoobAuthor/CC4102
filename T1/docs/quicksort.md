@@ -34,8 +34,6 @@ vector<int64_t> choosePivots(const string& filename, size_t memBytes, int parts)
 }
 ```
 
-````
-
 **¿Por qué funciona?**
 Este método garantiza que los pivotes sean representativos de toda la distribución de datos, incluso si no caben en memoria.
 
@@ -138,4 +136,7 @@ El algoritmo incluye:
 - Trabaja por bloques sin cargar el archivo completo
 - Crea un árbol de particiones temporal
 - Elimina archivos temporales automáticamente
-````
+
+```
+
+```
