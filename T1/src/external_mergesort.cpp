@@ -1,36 +1,9 @@
+#include "disk_io.hpp"
 #include "external_mergesort.hpp"
 #include <bits/stdc++.h>
 #include <queue>
 
 using namespace std;
-
-template<typename T>
-size_t getFileSize(const std::string& filename) {
-    ifstream in(filename, ios::binary | ios::ate);
-    return in.tellg();
-}
-
-vector<int64_t> readInts(const string& filename, size_t start, size_t count) {
-    vector<int64_t> data(count);
-    ifstream in(filename, ios::binary);
-    in.seekg(start * sizeof(int64_t), ios::beg);
-    in.read(reinterpret_cast<char*>(data.data()), count * sizeof(int64_t));
-    data.resize(in.gcount() / sizeof(int64_t));
-    return data;
-}
-
-void appendInts(const string& filename, const vector<int64_t>& data) {
-    ofstream out(filename, ios::binary | ios::app);
-    out.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(int64_t));
-}
-
-void sortInMemory(const string& inFile, const string& outFile) {
-    size_t n = getFileSize<int64_t>(inFile) / sizeof(int64_t);
-    auto v = readInts(inFile, 0, n);
-    sort(v.begin(), v.end());
-    ofstream out(outFile, ios::binary);
-    out.write(reinterpret_cast<const char*>(v.data()), v.size() * sizeof(int64_t));
-}
 
 vector<string> createInitialRuns(const string& inFile, size_t memBytes) {
     size_t intsPerRun = max<size_t>(1, memBytes / sizeof(int64_t));
@@ -68,7 +41,7 @@ void mergeRuns(vector<string>& runFiles, size_t /*memBytes*/, int arity) {
             auto cmp = [](const P &a, const P &b){ return a.first > b.first; };
             priority_queue<P, vector<P>, decltype(cmp)> pq(cmp);
             // initial load
-            for (int k = 0; k < ins.size(); ++k) {
+            for (size_t k = 0; k < ins.size(); ++k) {
                 int64_t x;
                 if (ins[k].read(reinterpret_cast<char*>(&x), sizeof(x)))
                     pq.emplace(x, k);
@@ -95,7 +68,7 @@ void externalMergesort(const string& inFile,
                        const string& outFile,
                        size_t memBytes,
                        int arity) {
-    if (getFileSize<int64_t>(inFile) <= memBytes) {
+    if (::getFileSize<int64_t>(inFile) <= memBytes) {
         sortInMemory(inFile, outFile);
         return;
     }

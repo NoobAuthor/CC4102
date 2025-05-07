@@ -1,104 +1,112 @@
-### Fase 1: Creación de Runs Iniciales
+# Tarea 1: Comparación de Mergesort Externo vs Quicksort Externo
 
-1. El archivo de entrada se divide en chunks (fragmentos) que caben en la memoria disponible.
-2. Cada chunk se carga en memoria, se ordena utilizando un algoritmo de ordenamiento interno (en este caso, `std::sort`), y se escribe de vuelta al disco como un "run" ordenado.
-3. Este proceso continúa hasta que todo el archivo de entrada ha sido procesado, generando múltiples runs ordenados.
+## Introducción
 
-### Fase 2: Merge de Runs
+Este proyecto implementa y compara dos algoritmos de ordenamiento externo (**Mergesort Externo** y **Quicksort Externo**) diseñados para trabajar con conjuntos de datos que no caben completamente en la memoria principal. El objetivo es evaluar su rendimiento en términos de:
 
-1. Los runs creados en la fase anterior se combinan de manera eficiente usando un proceso de merge de K-vías, donde K es la aridad del merge.
-2. Si hay más runs que la aridad permitida, se realizan múltiples pasadas de merge, combinando runs en cada pasada hasta que quede un solo run final ordenado.
-3. En cada paso del merge, se mantienen buffers para cada run de entrada y para el run de salida para minimizar los accesos a disco.
+- **Tiempo de ejecución**
+- **Cantidad de accesos a disco**
+- **Aridad óptima** (parámetro crítico para Mergesort)
 
-## Componentes Principales
+Ambos algoritmos utilizan la misma aridad óptima (`a`), determinada mediante una búsqueda binaria sobre un dataset de 60M elementos.
 
-### `external_mergesort`
+## Instrucciones de Ejecución
 
-Función principal que coordina todo el proceso de ordenamiento externo:
+### Requisitos:
 
-1. Determina el número de enteros que pueden caber en un bloque y en memoria.
-2. Crea archivos temporales para los runs.
-3. Llama a `create_initial_runs` para generar los runs iniciales ordenados.
-4. Realiza pasadas sucesivas de merge usando `merge_runs` hasta que quede un solo run.
-5. Renombra el último run como el archivo de salida final y limpia los archivos temporales.
+- Compilador C++17 (g++ o clang++)
+- Docker (opcional, para entorno controlado)
 
-```cpp
-void external_mergesort(const char* input_file, const char* output_file,
-                        size_t size, size_t block_size,
-                        size_t memory_limit, int arity)
+### Pasos:
+
+1. **Compilar el proyecto**:
+
+   ```bash
+   make          # Compila todos los componentes
+   ```
+
+2. **Ejecutar pruebas de correctitud**:
+
+   ```bash
+   make tests    # Verifica que ambos algoritmos ordenen correctamente
+   ```
+
+3. **Ejecutar experimento completo**:
+
+   ```bash
+   make experiment  # Genera resultados en results.csv
+   ```
+
+   Este comando realiza **3 pasos automáticos**:
+
+   - **Paso 1**: Genera un dataset de 60M elementos y determina la aridad óptima mediante búsqueda binaria.
+   - **Paso 2**: Ejecuta 5 iteraciones para cada tamaño de dataset (4M a 60M).
+   - **Paso 3**: Guarda métricas promediadas en `results.csv`.
+
+4. **Opcional: Ejecutar en Docker** (limita memoria a 512MB):
+   ```bash
+   make docker   # Construye y ejecuta en contenedor
+   ```
+
+### Parámetros clave:
+
+| Parámetro | Valor por defecto | Descripción                                 |
+| --------- | ----------------- | ------------------------------------------- |
+| `B`       | 4096 (4KB)        | Tamaño de bloque de disco                   |
+| `M`       | 52428800 (50MB)   | Memoria disponible                          |
+| `a`       | Automático        | Aridad óptima determinada experimentalmente |
+
+### Salidas:
+
+1. **Resultados numéricos**:
+   ```csv
+   N,alg,avg_time_ms,avg_reads,avg_writes
+   4000000,QUICK,1523.8,14200,13800
+   4000000,MERGE,1489.2,13500,13200
+   ...
+   ```
+2. **Log de consola**:
+   ```text
+   Aridad óptima encontrada: 16
+   Ejecutando experimento para N=4,000,000...
+   ```
+
+## Personalización avanzada
+
+1. **Modificar parámetros base** (en `Makefile`):
+
+   ```makefile
+   B := 4096        # Tamaño de bloque (bytes)
+   M := 52428800    # Memoria disponible (bytes)
+   ```
+
+2. **Forzar una aridad específica** (modificar `experiment.cpp`):
+   ```cpp
+   // En main(), reemplazar:
+   const int best_arity = findOptimalArity(...);
+   // Por:
+   const int best_arity = 24; // Valor manual
+   ```
+
+## Estructura del proyecto
+
+```
+T1/
+├── bin/           # Ejecutables compilados
+├── doc/           # Documentation on each individual file
+├── src/           # Código fuente
+├── test/          # Pruebas unitarias
+├── Makefile       # Configuración de compilación
+├── results.csv    # Resultados del experimento (generado)
+└── README.md      # Esta documentación
 ```
 
-### `create_initial_runs`
+## Análisis de resultados
 
-Divide el archivo de entrada en fragmentos que caben en memoria, los ordena y los escribe como runs individuales:
+El archivo `results.csv` permite comparar:
 
-1. Lee bloques del archivo de entrada hasta llenar la memoria disponible.
-2. Ordena los datos en memoria usando `std::sort`.
-3. Escribe los datos ordenados como un run en un archivo temporal.
-4. Repite hasta procesar todo el archivo de entrada.
+- **Escalabilidad** de ambos algoritmos con diferentes `N`.
+- **Impacto de la aridad** en el rendimiento.
+- **Eficiencia en I/O** (lecturas/escrituras por bloque).
 
-```cpp
-int create_initial_runs(const char* input_file, char** run_files,
-                        size_t size, size_t block_size,
-                        size_t memory_limit)
-```
-
-### `merge_runs`
-
-Combina múltiples runs en uno solo utilizando un algoritmo de merge de K-vías:
-
-1. Abre los archivos de cada run para lectura.
-2. Asigna buffers para cada run de entrada y para el run de salida.
-3. Inicializa estructuras para rastrear posiciones y elementos restantes en cada run.
-4. Carga los primeros bloques de cada run en sus respectivos buffers.
-5. Repite hasta que todos los runs estén vacíos:
-   - Encuentra el run con el elemento más pequeño actual.
-   - Mueve ese elemento al buffer de salida.
-   - Si el buffer de salida está lleno, escríbelo a disco.
-   - Si un buffer de entrada se vacía y quedan elementos en el run, carga más datos de ese run.
-6. Escribe cualquier dato restante en el buffer de salida y limpia recursos.
-
-```cpp
-void merge_runs(char** run_files, size_t* run_sizes,
-                const char* output_file, int num_runs,
-                size_t block_size, size_t buffer_blocks,
-                int arity)
-```
-
-## Manejo de Disco
-
-El código implementa un manejo eficiente de disco mediante:
-
-1. **Operaciones por Bloques**: Todas las lecturas y escrituras se realizan por bloques completos.
-2. **Buffers**: Se utilizan buffers en memoria para minimizar las operaciones de E/S.
-3. **Archivos Temporales**: Los runs intermedios se almacenan en archivos temporales que se eliminan cuando ya no son necesarios.
-
-## Función de Prueba
-
-La función `test_mergesort` permite probar el algoritmo con diferentes parámetros y medir su rendimiento:
-
-1. Crea una copia del archivo de entrada para no modificarlo.
-2. Ejecuta el algoritmo de mergesort y mide el tiempo y los accesos a disco.
-3. Verifica que el resultado esté correctamente ordenado.
-4. Devuelve una métrica combinada de rendimiento (IO + tiempo).
-
-```cpp
-int64_t test_mergesort(const char* filename, size_t size,
-                      size_t block_size, size_t memory_limit,
-                      int arity)
-```
-
-## Complejidad
-
-La complejidad del algoritmo en términos de accesos a disco (I/O) es:
-
-O((N/B) \* log_K(N/M))
-
-Donde:
-
-- N: Número total de enteros a ordenar
-- B: Número de enteros por bloque
-- M: Número de enteros que caben en memoria
-- K: Aridad del merge
-
-Esta implementación está optimizada para minimizar tanto los accesos a disco como el tiempo total de ejecución.
+¡Contribuciones y mejoras son bienvenidas! 🚀
