@@ -34,8 +34,6 @@ vector<int64_t> choosePivots(const string& filename, size_t memBytes, int parts)
 }
 ```
 
-````
-
 **¿Por qué funciona?**
 Este método garantiza que los pivotes sean representativos de toda la distribución de datos, incluso si no caben en memoria.
 
