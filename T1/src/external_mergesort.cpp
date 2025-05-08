@@ -11,7 +11,7 @@
 const size_t BLOQUE = 4096
 const size_t M = 51200
 const size_t B_LIMIT = BLOQUE / sizeof(int64_t); 
-const size_t M_LIMIT = 51200/ sizeof(int64_t); 
+const size_t M_LIMIT = M/ sizeof(int64_t); 
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -221,11 +221,11 @@ void phase2_merge(vector<string> temp_files, const string& output_file, int arit
 }
 
 
-void sort_large_binary_file(const string& input_file, const string& output_file) {
+void externalMergesort(const string& input_file, const string& output_file, size_t memBytes, int arity) {
     vector<string> temp_files;
     phase1_split_and_sort(input_file, temp_files);
     if (!temp_files.empty()) {
-        phase2_merge(temp_files, output_file);
+        phase2_merge(temp_files, output_file, arity);
         cout << "Ordenamiento completo." << endl;
     }
 }
@@ -234,6 +234,6 @@ int main() {
     string input_file = "input.bin";
     string output_file = "output.bin";
 
-    sort_large_binary_file(input_file, output_file);
+    externalMergesort(input_file, output_file, arity);
     return 0;
 }
