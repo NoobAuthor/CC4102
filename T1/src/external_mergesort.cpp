@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <cstdio>
 #include <cstdint>  // para int64_t
+#include "external_mergesort.hpp" 
 
 const size_t BLOQUE = 4096
 const size_t M = 51200
