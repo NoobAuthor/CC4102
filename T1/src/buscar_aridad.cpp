@@ -10,13 +10,13 @@
 #include <string>
 #include <vector>
 
-
 const size_t BLOQUE = 4*1024;
 const size_t M = 50*1024*1024;
 const size_t B_LIMIT = BLOQUE / sizeof(int64_t); 
 const size_t M_LIMIT = M/ sizeof(int64_t); 
 size_t total_reads = 0;
 size_t total_writes = 0;
+
 
 
 using namespace std;
@@ -163,6 +163,24 @@ void refill_buffer(ifstream& in, vector<int64_t>& buffer, size_t size_buffer, si
     }
 }
 
+void write_buffer_in_blocks(ofstream& out, const vector<int64_t>& buffer, size_t items_to_write) {
+    size_t bytes_to_write = items_to_write * sizeof(int64_t);
+    size_t offset = 0;
+
+    while (offset < bytes_to_write) {
+        size_t chunk = min(BLOQUE, bytes_to_write - offset);
+        out.write(reinterpret_cast<const char*>(buffer.data()) + offset, chunk);
+        total_writes++;
+
+        if (!out) {
+            cerr << "Error al escribir bloque en archivo temporal." << endl;
+            break;
+        }
+
+        offset += chunk;
+    }
+}
+
 
 void phase1_split_and_sort(const string& input_file, vector<string>& temp_files) {
     ifstream infile(input_file, ios::binary);
@@ -186,8 +204,7 @@ void phase1_split_and_sort(const string& input_file, vector<string>& temp_files)
             cerr << "Error al crear archivo temporal." << endl;
             return;
         }
-        temp_out.write(reinterpret_cast<char*>(buffer.data()), items_read * sizeof(int64_t));
-        total_writes++;
+        write_buffer_in_blocks(temp_out, buffer, items_read);
         if (!temp_out) {
             cerr << "Error al escribir en archivo temporal." << endl;
             return;
@@ -242,6 +259,8 @@ void merge_multiple_files(const vector<string>& input_files, const string& outpu
 void phase2_merge(vector<string> temp_files, const string& output_file, int arity) {
     while (temp_files.size() > 1) {
         vector<string> next_round;
+        cout << "Aquí comienza una ronda " << temp_files.size() << endl;
+
         for (size_t i = 0; i < temp_files.size(); i += arity) {
             vector<string> group;
             for (size_t j = i; j < i + arity && j < temp_files.size(); ++j) {
@@ -302,44 +321,75 @@ void externalMergesort(const string& input_file, const string& output_file, size
 }
 
 
+int buscar_a_optimo(const string& input_file, const string& output_file, int min_a, int max_a, const string& log_csv) {
+    ofstream log(log_csv);
+    log << "a,Promedio_Lecturas,Promedio_Escrituras,Costo_Total_I/O\n";
+    const string input_file2 = "temp_input2.bin";
+    int mejor_a = min_a;
+    size_t mejor_costo = SIZE_MAX;
+    generate_random_blocks(input_file, 60 * M_LIMIT, B_LIMIT, 1LL << 60); 
 
-int main() {
-    ofstream log_file("resultados.csv");
-    log_file << "N(M),Intento,Tiempo(segundos),Lecturas,Escrituras\n";
-    for (int i = 1; i <= 15; ++i) {  // N = 4M, 8M, ..., 60M
-        size_t N = 4 * i * M_LIMIT;
-        
-        // Loop to create 5 distinct input files
-        for (int attempt = 1; attempt <= 5; ++attempt) {
-            string input_file = "input_" + to_string(4 * i) + "M_attempt_" + to_string(attempt) + ".bin";
-            string output_file = "output_" + to_string(4 * i) + "M_attempt_" + to_string(attempt) + ".bin";
-        
-            cout << "\nGenerando archivo de entrada para N = " << N << " (Intento " << attempt << ")..." << endl;
-            generate_random_blocks(input_file, N, B_LIMIT, 1LL << 60);  // max_range grande
-        
-            cout << "Iniciando ordenamiento externo para N = " << N << " (Intento " << attempt << ")..." << endl;
-            auto inicio = chrono::high_resolution_clock::now();
-        
-            externalMergesort(input_file, output_file, M, 4);
-        
-            auto fin = chrono::high_resolution_clock::now();
-            chrono::duration<double> duracion = fin - inicio;
-        
-            cout << "Tiempo de ejecución: " << duracion.count() << " segundos" << endl;
-            log_file << (4 * i) << "," << attempt << "," << duracion.count() << "," << total_reads << "," << total_writes << "\n";
-            total_reads = 0;
-            total_writes = 0;
+    auto evaluar = [&](int a) {
+        fs::copy_file(input_file, input_file2 , fs::copy_options::overwrite_existing);
+        total_reads = total_writes = 0;
+        externalMergesort(input_file2, output_file, M, a);
+        fs::remove(input_file2);
+        fs::remove(output_file);
 
+        size_t costo = total_reads + total_writes;
+        log << a << "," << (total_reads) << "," << (total_writes) << "," << (costo) << "\n";
 
-        
-            // Elimina los archivos para ahorrar espacio
-            fs::remove(input_file);
-            fs::remove(output_file);
+        return costo;
+    };
+
+    while (max_a - min_a > 3) {
+        int m1 = min_a + (max_a - min_a) / 3;
+        int m2 = max_a - (max_a - min_a) / 3;
+
+        size_t costo_m1 = evaluar(m1);
+        size_t costo_m2 = evaluar(m2);
+
+        if (costo_m1 < costo_m2) {
+            max_a = m2;
+            if (costo_m1 < mejor_costo) {
+                mejor_costo = costo_m1;
+                mejor_a = m1;
+            }
+        } else {
+            min_a = m1;
+            if (costo_m2 < mejor_costo) {
+                mejor_costo = costo_m2;
+                mejor_a = m2;
+            }
         }
     }
-    
-    log_file.close();
-    cout << "Resultados guardados en resultados.csv" << endl;
+
+    for (int a = min_a; a <= max_a; ++a) {
+        size_t costo = evaluar(a);
+        if (costo < mejor_costo) {
+            mejor_costo = costo;
+            mejor_a = a;
+        }
+    }
+
+    log.close();
+    cout << "Mejor valor de a encontrado: " << mejor_a << " con costo total aproximado: " << mejor_costo << " I/Os promedio\n" << endl;
+    return mejor_a;
+}
+
+
+
+
+int main() {
+    const string input_file = "temp_input.bin";
+    const string output_file = "temp_output.bin";
+    const string log_csv = "busqueda_a.csv";
+
+    int b = BLOQUE / sizeof(int64_t);  // Máximo valor posible para a
+    int mejor_a = buscar_a_optimo(input_file, output_file, 2, b, log_csv);
+
+    cout << "Valor óptimo de a para usar en Quicksort externo: " << mejor_a << endl;
     return 0;
 }
+
 
