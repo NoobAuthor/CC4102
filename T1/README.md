@@ -1,104 +1,209 @@
-### Fase 1: Creación de Runs Iniciales
+# Algoritmos de Ordenamiento Externos
 
-1. El archivo de entrada se divide en chunks (fragmentos) que caben en la memoria disponible.
-2. Cada chunk se carga en memoria, se ordena utilizando un algoritmo de ordenamiento interno (en este caso, `std::sort`), y se escribe de vuelta al disco como un "run" ordenado.
-3. Este proceso continúa hasta que todo el archivo de entrada ha sido procesado, generando múltiples runs ordenados.
+Este proyecto implementa y compara dos algoritmos de ordenamiento externo: MergeSort y QuickSort. Incluye funcionalidad para medir tiempos de ejecución y accesos a disco durante las operaciones de ordenamiento.
 
-### Fase 2: Merge de Runs
+## Requisitos
 
-1. Los runs creados en la fase anterior se combinan de manera eficiente usando un proceso de merge de K-vías, donde K es la aridad del merge.
-2. Si hay más runs que la aridad permitida, se realizan múltiples pasadas de merge, combinando runs en cada pasada hasta que quede un solo run final ordenado.
-3. En cada paso del merge, se mantienen buffers para cada run de entrada y para el run de salida para minimizar los accesos a disco.
+- CMake (versión 3.10 o superior)
+- Compilador C++ compatible con C++17
+- Python 3 con las siguientes bibliotecas:
+  - matplotlib
+  - pandas
+  - numpy
+- Docker (opcional, para pruebas con memoria limitada)
 
-## Componentes Principales
+## Instalación de Dependencias
 
-### `external_mergesort`
+### Ubuntu/Debian
 
-Función principal que coordina todo el proceso de ordenamiento externo:
-
-1. Determina el número de enteros que pueden caber en un bloque y en memoria.
-2. Crea archivos temporales para los runs.
-3. Llama a `create_initial_runs` para generar los runs iniciales ordenados.
-4. Realiza pasadas sucesivas de merge usando `merge_runs` hasta que quede un solo run.
-5. Renombra el último run como el archivo de salida final y limpia los archivos temporales.
-
-```cpp
-void external_mergesort(const char* input_file, const char* output_file,
-                        size_t size, size_t block_size,
-                        size_t memory_limit, int arity)
+```bash
+sudo apt update
+sudo apt install build-essential cmake python3 python3-pip
+pip3 install matplotlib pandas numpy
 ```
 
-### `create_initial_runs`
+### Fedora
 
-Divide el archivo de entrada en fragmentos que caben en memoria, los ordena y los escribe como runs individuales:
-
-1. Lee bloques del archivo de entrada hasta llenar la memoria disponible.
-2. Ordena los datos en memoria usando `std::sort`.
-3. Escribe los datos ordenados como un run en un archivo temporal.
-4. Repite hasta procesar todo el archivo de entrada.
-
-```cpp
-int create_initial_runs(const char* input_file, char** run_files,
-                        size_t size, size_t block_size,
-                        size_t memory_limit)
+```bash
+sudo dnf install gcc-c++ cmake python3 python3-pip
+pip3 install matplotlib pandas numpy
 ```
 
-### `merge_runs`
+### macOS
 
-Combina múltiples runs en uno solo utilizando un algoritmo de merge de K-vías:
-
-1. Abre los archivos de cada run para lectura.
-2. Asigna buffers para cada run de entrada y para el run de salida.
-3. Inicializa estructuras para rastrear posiciones y elementos restantes en cada run.
-4. Carga los primeros bloques de cada run en sus respectivos buffers.
-5. Repite hasta que todos los runs estén vacíos:
-   - Encuentra el run con el elemento más pequeño actual.
-   - Mueve ese elemento al buffer de salida.
-   - Si el buffer de salida está lleno, escríbelo a disco.
-   - Si un buffer de entrada se vacía y quedan elementos en el run, carga más datos de ese run.
-6. Escribe cualquier dato restante en el buffer de salida y limpia recursos.
-
-```cpp
-void merge_runs(char** run_files, size_t* run_sizes,
-                const char* output_file, int num_runs,
-                size_t block_size, size_t buffer_blocks,
-                int arity)
+```bash
+brew install cmake python
+pip3 install matplotlib pandas numpy
 ```
 
-## Manejo de Disco
+### Windows
 
-El código implementa un manejo eficiente de disco mediante:
+- Instalar CMake
+- Instalar MinGW o Visual Studio
+- Instalar Python
+- Instalar las bibliotecas de Python:
 
-1. **Operaciones por Bloques**: Todas las lecturas y escrituras se realizan por bloques completos.
-2. **Buffers**: Se utilizan buffers en memoria para minimizar las operaciones de E/S.
-3. **Archivos Temporales**: Los runs intermedios se almacenan en archivos temporales que se eliminan cuando ya no son necesarios.
-
-## Función de Prueba
-
-La función `test_mergesort` permite probar el algoritmo con diferentes parámetros y medir su rendimiento:
-
-1. Crea una copia del archivo de entrada para no modificarlo.
-2. Ejecuta el algoritmo de mergesort y mide el tiempo y los accesos a disco.
-3. Verifica que el resultado esté correctamente ordenado.
-4. Devuelve una métrica combinada de rendimiento (IO + tiempo).
-
-```cpp
-int64_t test_mergesort(const char* filename, size_t size,
-                      size_t block_size, size_t memory_limit,
-                      int arity)
+```bash
+pip install matplotlib numpy pandas
 ```
 
-## Complejidad
+## Compilación del Proyecto
 
-La complejidad del algoritmo en términos de accesos a disco (I/O) es:
+- Clonar el repositório:
 
-O((N/B) \* log_K(N/M))
+```bash
+git clone <url-del-repositorio>
+cd T1
+```
 
-Donde:
+- Crear un directorio de compilación:
 
-- N: Número total de enteros a ordenar
-- B: Número de enteros por bloque
-- M: Número de enteros que caben en memoria
-- K: Aridad del merge
+```bash
+mkdir build
+cd build
+```
 
-Esta implementación está optimizada para minimizar tanto los accesos a disco como el tiempo total de ejecución.
+- Configurar el proyecto con CMake:
+
+```bash
+cmake ..
+```
+
+- Compilar el proyecto:
+
+```bash
+make
+```
+
+## Ejecución de Experimentos
+
+El proyecto incluye varios targets de CMake para facilitar la ejecución de experimentos:
+Generación de Datos
+
+- Generar todos los conjuntos de datos (4M hasta 60M):
+
+```bash
+make generate_data
+```
+
+- Generar datos hasta un tamaño específico (ejemplo: 32M):
+
+```bash
+make generate_data_32M
+```
+
+Encontrar la Aridad Óptima
+La aridad óptima se utiliza tanto para MergeSort como para QuickSort:
+
+```bash
+make find_optimal_arity
+```
+
+Ejecutar Experimentos
+
+- Ejecutar experimentos para todos los tamaños:
+
+```bash
+make run_experiments_all
+```
+
+- Ejecutar experimentos para un tamaño específico (ejemplo: 32M):
+
+```bash
+make run_experiments_32M
+```
+
+- Generar visualizaciones de resultados:
+
+```bash
+make visualize_results
+```
+
+- Ejecutar el flujo completo (generación de datos, búsqueda de aridad, experimentos, visualizaciones):
+
+```bash
+make run_complete_experiment
+```
+
+## Uso del Contenedor Docker
+
+Para una ejecución con memoria limitada controlada (requisito del proyecto):
+
+- Instalar Docker desde docker.com
+
+- Verificar la instalación:
+
+```bash
+docker --version
+```
+
+- Si aparece un error de permisos, añadir tu usuario al grupo docker:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker  # Aplica los cambios sin cerrar sesión
+```
+
+- Ejecutar el contenedor con el proyecto montado:
+
+```bash
+docker run --rm -it -v "$PWD":/workspace pabloskewes/cc4102-cpp-env bash
+```
+
+- Dentro del contenedor, instalar CMake si es necesario:
+
+```bash
+apt-get update
+apt-get install -y cmake python3-dev python3-pip
+pip3 install pandas matplotlib numpy
+```
+
+- Compilar y ejecutar dentro del contenedor:
+
+```bash
+cd /workspace
+mkdir -p build
+cd build
+cmake ..
+make run_complete_experiment
+```
+
+- Si el contenedor se queda sin memoria, aumentar el límite:
+
+```bash
+docker run --rm -it -m 70m -v "$PWD":/workspace pabloskewes/cc4102-cpp-env bash
+```
+
+## Estructura del Proyecto
+
+- include/: Archivos de cabecera
+
+  - algorithms/: Declaraciones de los algoritmos de ordenamiento
+  - utils/: Utilidades (manejo de archivos, temporizador, generación de datos)
+
+- src/: Implementaciones
+
+  - algorithms/: Implementación de los algoritmos
+  - utils/: Implementación de utilidades
+
+- tests/: Pruebas y experimentos
+
+- build/: Directorio generado para archivos compilados
+  - data/: Datos generados y resultados
+  - results/: Gráficos generados
+
+## Limpieza
+
+Para limpiar datos y resultados generados:
+
+```bash
+make clean_data
+make clean_results
+```
+
+## Notas Adicionales
+
+- El parámetro M está configurado en 50MB tal como se requiere en el proyecto
+- La búsqueda de aridad óptima explora el rango [2, 512]
+- Los experimentos generan 5 secuencias para cada tamaño de datos
+- Las visualizaciones muestran tiempos de ejecución y accesos a disco para ambos algoritmos
