@@ -136,3 +136,10 @@ El algoritmo incluye:
 - Trabaja por bloques sin cargar el archivo completo
 - Crea un árbol de particiones temporal
 - Elimina archivos temporales automáticamente
+<<<<<<< HEAD
+=======
+
+```
+
+```
+>>>>>>> cf151cbac6a42acb8bdc53eadb4ee385d3c2e750
