@@ -103,8 +103,6 @@ Esto crea un archivo `results/informe.md` con el resumen, visualizaciones y enla
 
 ## Autores
 
-- [Nombre del integrante 1]
-- [Nombre del integrante 2]
-- [Nombre del integrante 3]
-
-(Completar con los nombres de los integrantes del grupo)
+- Igor Assis
+- Nicolás Montenegro
+- Joaquín Ramírez
