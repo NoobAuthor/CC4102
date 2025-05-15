@@ -5,21 +5,31 @@
 /**
  * Constructor: inicializa n conjuntos disjuntos.
  */
-UnionFind::UnionFind(int n) : parent(n), rank(n, 0) {
+UnionFind::UnionFind(int n, bool usePathCompression)
+    : parent(n), rank(n, 0), usePathCompression(usePathCompression) {
   for (int i = 0; i < n; ++i) {
     parent[i] = i;
   }
 }
 
 /**
- * Encuentra el representante del conjunto que contiene a x (con compresión de
- * caminos).
+ * Encuentra el representante del conjunto que contiene a x.
+ * Implementa dos variantes: con y sin compresión de caminos.
  */
 int UnionFind::find(int x) {
-  if (parent[x] != x) {
-    parent[x] = find(parent[x]);  // Path compression
+  if (usePathCompression) {
+    // Versión con compresión de caminos
+    if (parent[x] != x) {
+      parent[x] = find(parent[x]);
+    }
+    return parent[x];
+  } else {
+    // Versión sin compresión de caminos
+    while (x != parent[x]) {
+      x = parent[x];
+    }
+    return x;
   }
-  return parent[x];
 }
 
 /**
