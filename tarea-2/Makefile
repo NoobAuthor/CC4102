@@ -1,32 +1,30 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -O2
 
-# Source files
+# Main program
 SRCS = src/main.cpp src/kruskal.cpp src/union_find.cpp
-
-# Object files
-BUILD_DIR = build
-OBJS = $(SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
-
-# Target executable
 TARGET = kruskal
 
-.PHONY: all clean experiment dirs
+# Test program
+TEST_SRCS = tests/test_main.cpp src/kruskal.cpp src/union_find.cpp
+TEST_TARGET = test_main
 
-all: dirs $(TARGET)
+.PHONY: all clean test experiment
 
-dirs:
-	@mkdir -p $(BUILD_DIR) input results
+all: $(TARGET)
 
-$(BUILD_DIR)/%.o: src/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(TARGET): $(SRCS)
+	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $(TARGET)
+test: $(TEST_SRCS)
+	$(CXX) $(CXXFLAGS) $(TEST_SRCS) -o $(TEST_TARGET)
+	./$(TEST_TARGET)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) input/* results/*
+	rm -f $(TARGET) $(TEST_TARGET)
+	rm -rf input/* results/*
 
 experiment: all
+	mkdir -p input results
 	chmod +x run_experiment.sh
 	./run_experiment.sh 
