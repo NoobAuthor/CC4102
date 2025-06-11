@@ -11,8 +11,9 @@ class UnionFind {
   /**
    * Constructor: inicializa n conjuntos disjuntos.
    * @param n Número de elementos.
+   * @param usePathCompression Si se debe usar compresión de caminos.
    */
-  UnionFind(int n);
+  UnionFind(int n, bool usePathCompression = true);
 
   /**
    * Encuentra el representante del conjunto que contiene a x.
@@ -39,4 +40,5 @@ class UnionFind {
  private:
   std::vector<int> parent;  // Vector de padres
   std::vector<int> rank;    // Vector de rangos para optimización
+  bool usePathCompression;  // Flag para usar o no compresión de caminos
 };

@@ -1,30 +1,30 @@
-# Makefile for Tarea 2 - Algoritmos y Estructuras de Datos
-
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -I./src
-SRC_DIR = src
-OBJ_DIR = build
-BIN_DIR = bin
-TEST_DIR = tests
+CXXFLAGS = -std=c++17 -Wall -O2
 
-SRCS = $(wildcard $(SRC_DIR)/*.cpp)
-OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))
-TARGET = $(BIN_DIR)/main
+# Main program
+SRCS = src/main.cpp src/kruskal.cpp src/union_find.cpp
+TARGET = kruskal
+
+# Test program
+TEST_SRCS = tests/test_main.cpp src/kruskal.cpp src/union_find.cpp
+TEST_TARGET = test_main
+
+.PHONY: all clean test experiment
 
 all: $(TARGET)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(TARGET): $(SRCS)
+	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET)
 
-$(TARGET): $(OBJS)
-	@mkdir -p $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $^ -o $@
+test: $(TEST_SRCS)
+	$(CXX) $(CXXFLAGS) $(TEST_SRCS) -o $(TEST_TARGET)
+	./$(TEST_TARGET)
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -f $(TARGET) $(TEST_TARGET)
+	rm -rf input/* results/*
 
-.PHONY: all clean test
-
-test:
-	$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_main.cpp -o $(BIN_DIR)/test_main && $(BIN_DIR)/test_main 
+experiment: all
+	mkdir -p input results
+	chmod +x run_experiment.sh
+	./run_experiment.sh 
